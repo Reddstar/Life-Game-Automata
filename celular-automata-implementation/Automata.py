@@ -1,117 +1,170 @@
 import time
 
-def start_generations(raw_data, generations, show_evolving=False, evolving_delay=2):
+def start_generations(raw_data, rules=1, show_evolving=False, evolving_delay=2):
     """Transforms the raw data in a matrix and evolve generations as the generations number"""
 
-    matrix = get_matrix_from_raw(raw_data, 4)
-    print ("==== Starting Configuration ====")
-    show_given_configuration(matrix)
-    print ("================================")
+    matrix = get_matrix_from_raw(raw_data)
     generation = 0
-    stop_evolving = False
-    while generation < generations and not stop_evolving:
-        try:
-            matrix = [] + evolve_automata(matrix, 4)
-            generation += 1
-            if show_evolving:
-                time.sleep(evolving_delay)
-                show_given_configuration(matrix)
-                print ("----------------")          
-        except:
-            print ("Unexpected Break")
-            show_given_configuration(matrix)
-            stop_evolving = True
+    steady_state = False
+    while not steady_state:
+        new_matrix = evolve_automata(matrix, rules)
+        steady_state = check_stable_state(matrix, new_matrix)
+        matrix = new_matrix
+        if show_evolving:
+            print (matrix)
+            time.sleep(evolving_delay)
+    
+    return ''.join(matrix)
 
-    print ("===== Final Configuration =====")
-    show_given_configuration(matrix)
-    print ("===============================")
-            
+def get_matrix_from_raw(raw_data):
+    """Transforms the raw input into the automata matrix"""
 
-def evolve_automata(matrix, n):
-    """Evolves the current celular automata applying Life Game rules"""
+    return list(raw_data+'#')
+    
+
+def check_stable_state(old_cells, new_cells):
+    """Checks if new generation cells are equal to previous generation cells, 
+    if so, the system has arrived on a steady state"""
+
+    same_cells = True
+    for x in range(len(old_cells)):
+        if old_cells[x] != new_cells[x]:
+            same_cells = False
+
+    return same_cells
+
+def evolve_automata(matrix, rules=1):
+    """
+    Evolves the current celular automata applying the appropriate rules
+    1: Sucessor rules
+    0: Zero rules
+    """
 
     new_gen_matrix = []
-    for x in range(n):
-        new_gen_line = []
-        for y in range(n):
-            cell_position = (x, y)
-            cell = apply_rules(cell_position, matrix)
-            new_gen_line.append(cell)
-        gen_line = [] + new_gen_line
-        new_gen_matrix.append(gen_line)
+    for x in range(len(matrix)):
+        if rules == 1:
+            cell = apply_successor_rules(x, matrix)
+        elif rules == 0:
+            cell = apply_zero_rules(x, matrix)
+        elif rules == 2:
+            cell = apply_predecessor_rules(x, matrix)
+        new_gen_matrix.append(cell)
     
     return new_gen_matrix
 
 
-def apply_rules(cell_position, matrix):
-    """Apply rules to a cell and returns the updated cell"""
+def apply_successor_rules(cell_position, matrix):
+    """
+    Applies the successor rules to a cell and returns the updated cell
+    A cell # who has any number to the left and not any neighbors to the right, it will become ''.
+    A cell # who has a '' or 0 to the right, it will become '0'
+    A cell 1 who has # to the right, it will become '#'
+    A cell 0 who has # to the right, it will become '1'
+    """
 
-    x = cell_position[0]
-    y = cell_position[1]
-    cell = matrix[x][y]
-    neighbors = get_vertical_neighborhood(cell_position, matrix)
-    alive_cells = count_alive_cells(neighbors)
+    cell = matrix[cell_position]
+    right_neighbor = get_right_neighbor(cell_position, matrix)
+    left_neighbor = get_left_neighbor(cell_position, matrix)
 
-    if cell == '1' and (alive_cells <= 1 or alive_cells == 4):
-        cell = '0'
-    elif cell == '0' and alive_cells == 3:
-        cell = '1'
-    
+    if cell == '#':
+        if right_neighbor == None and (left_neighbor == '1' or left_neighbor == '0'):
+            cell = ''
+        elif right_neighbor == '' or right_neighbor == '0':
+            cell = '0'
+    elif cell == '1':
+        if right_neighbor == '#':
+            cell = '#'
+    elif cell == '0':
+        if right_neighbor == '#':
+            cell = '1'
+
     return cell
 
-def count_alive_cells(neighbors):
-    """Counts the number of cells which are alive in the neighborhood"""
+def apply_predecessor_rules(cell_position, matrix):
+    """
+    Applies the successor rules to a cell and returns the updated cell
+    A cell # who has any number to the left and not any neighbors to the right, it will become ' '.
+    A cell # who has a ' ' or 1 to the right, it will become '1'
+    A cell 0 who has # to the right, it will become '#'
+    A cell 1 who has # to the right, it will become '0'
+    """
 
-    cell_count = 0
-    for cell in neighbors:
-        if cell == '1':
-            cell_count += 1
+    cell = matrix[cell_position]
+    right_neighbor = get_right_neighbor(cell_position, matrix)
+    left_neighbor = get_left_neighbor(cell_position, matrix)
+
+    if cell == '#':
+        if right_neighbor == None and (left_neighbor == '1' or left_neighbor == '0'):
+            cell = ''
+        elif right_neighbor == '' or right_neighbor == '1':
+            cell = '1'
+    elif cell == '0':
+        if right_neighbor == '#':
+            cell = '#'
+    elif cell == '1':
+        if right_neighbor == '#':
+            cell = '0'
+
+    return cell
+
+
+def apply_zero_rules(cell_position, matrix):
+    """
+    Applies the zero rules to a cell and returns the updated cell
+    All cells except for # and '', will become 0
+    """
+    cell = matrix[cell_position]
+    if cell == '#' or cell == '':
+        return ''
+    else:
+        return '0'
+
+def get_right_neighbor(x, matrix):
+    """Gets right neighbor of a cell by its given position"""
+
+    if x >= (len(matrix) - 1):
+        return None
+    else:
+        return matrix[x + 1]
+
+def get_left_neighbor(x, matrix):
+    """Gets the left neighbor of a cell by its given position"""
+
+    if x <= 0:
+        return None
+    else:
+        return matrix[x - 1]
+
+
+def Z(x):
+    return start_generations(x, 0)
+
+def S(x):
+    return start_generations(x, 1)
+
+def Pred(x):
+    if x == Z(x):
+        return x
+    else:
+        return start_generations(x, 2)
+
+def Add(x, y):
+    if x == Z(x):
+        return y
+    else:
+        return S(Add(Pred(x), y))
     
-    return cell_count
+def Prod(x, y):
+    if x == Z(x):
+        return Z(x)
+    else:
+        return Add(y, Prod(Pred(x), y))
 
-
-def get_vertical_neighborhood(position, matrix):
-    """Gets the vertical neighbors of a cell by its given position"""
-
-    x = position[0]
-    y = position[1]
-    all_positions = [(x, y-1), (x-1, y), (x, y+1), (x+1, y)]
-    valid_positions = check_valid_positions(all_positions, 0, len(matrix) - 1)
-    neighbors = []
-    for p in valid_positions:
-        neighbors.append(matrix[p[0]][p[1]])
-    
-    return neighbors
-    
-def check_valid_positions(positions, min, max):
-    """Return only the valid positions using the min and max coordinate possible"""
-
-    valid_positions = []
-    for position in positions:
-        x = position[0]
-        y = position[1]
-        if (x >= min and x <= max) and (y >= min and y <= max):
-            valid_positions.append(position)
-    return valid_positions
-    
-
-def get_matrix_from_raw(raw_data, n):
-    """Transforms the raw input into the automata matrix"""
-
-    parts = raw_data.split(" ")
-    matrix = []
-    for i in range(n):
-        matrix.append(list(parts[i]))
-    return matrix
-
-
-def show_given_configuration(configuration_matrix):
-    """Shows give configuration formatted as matrix"""
-
-    for x in range(len(configuration_matrix)):
-        for y in range(len(configuration_matrix[0])):
-            print (configuration_matrix[x][y], end=' ')
-        print ("")
+def Exp(x, y):
+    if x == Z(x):
+        return S(Z(x))
+    else:
+        return Prod(y, Exp(Pred(x), y))
 
 if __name__ == "__main__":
-    start_generations("1011 1111 1111 1111 # 0000 0000 0000 0000", 4, True)
+    print (Exp("0011", "0010"))
